@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/xml"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -40,6 +41,23 @@ var (
 		"address_postal_code":  gopostalExpand.AddressPostalCode,
 	}
 )
+
+// Unstructured Address Structs
+type UnstructuredPstlAdr struct {
+	AdrLines []string `xml:"AdrLine"`
+}
+
+// Structured ISO 20022 Address Structs
+type StructuredPstlAdr struct {
+	XMLName xml.Name `xml:"PstlAdr"`
+	BldgNm  string   `xml:"BldgNm,omitempty"`
+	Flr     string   `xml:"Flr,omitempty"`
+	StrtNm  string   `xml:"StrtNm,omitempty"`
+	BldgNb  string   `xml:"BldgNb,omitempty"`
+	PstCd   string   `xml:"PstCd,omitempty"`
+	TwnNm   string   `xml:"TwnNm,omitempty"`
+	Ctry    string   `xml:"Ctry,omitempty"`
+}
 
 func mapQueryParamsOnExpandOptions(options gopostalExpand.ExpandOptions, queryParams url.Values) gopostalExpand.ExpandOptions {
 	for key, values := range queryParams {
@@ -181,6 +199,52 @@ var rootCmd = &cobra.Command{
 				},
 			)
 			c.JSON(http.StatusOK, parsed)
+		})
+
+		r.GET("/parsePstlAdr", func(c *gin.Context) {
+			// 1. Mock Input XML
+			xmlInput := c.DefaultQuery("PstlAdr", "")
+
+			// 2. Unmarshal existing XML to get the lines
+			var oldAdr UnstructuredPstlAdr
+			err := xml.Unmarshal([]byte(xmlInput), &oldAdr)
+			if err != nil {
+				panic(err)
+			}
+
+			// 3. Combine lines into a single string for the parser
+			fullAddress := strings.Join(oldAdr.AdrLines, ", ")
+
+			// 4. Parse using gopostal
+			parsedComponents := gopostalParser.ParseAddress(fullAddress)
+
+			// 5. Map components to Structured Struct
+			newAdr := StructuredPstlAdr{}
+			for _, comp := range parsedComponents {
+				val := strings.ToUpper(comp.Value)
+
+				switch comp.Label {
+				case "house":
+					newAdr.BldgNm = val
+				case "level":
+					newAdr.Flr = val
+				case "road":
+					newAdr.StrtNm = val
+				case "house_number":
+					newAdr.BldgNb = val
+				case "postcode":
+					newAdr.PstCd = val
+				case "city":
+					newAdr.TwnNm = val
+				case "country":
+					// In production, use a lookup table to convert "BELGIUM" to "BE"
+					newAdr.Ctry = val
+				}
+			}
+
+			// 6. Marshal back to XML
+			output, _ := xml.MarshalIndent(newAdr, "", "  ")
+			c.String(http.StatusOK, string(output))
 		})
 
 		// root
