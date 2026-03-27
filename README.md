@@ -2,12 +2,6 @@
 
 This Docker image provides a web server that grants access to the [libpostal](https://github.com/openvenues/libpostal) library, enabling the parsing and normalization of street addresses globally. It need at least 2Gb of RAM (use 4GB for safety)
 
-[Ready docker image](https://github.com/le0pard/postal_server/pkgs/container/postal_server)
-
-```bash
-docker pull ghcr.io/le0pard/postal_server:latest
-```
-
 ## Usage
 
 ### Expand address
@@ -108,6 +102,18 @@ Support additional parameters:
 
 This will break down the address into its [individual components](https://github.com/openvenues/libpostal?tab=readme-ov-file#parser-labels).
 
+To parse addresses from iso fragment, <PstlAdr> tag, use the `/parsePstlAdr` endpoint with the `PstlAdr` query parameter. For example, to parse the address "781 Franklin Ave Crown Heights Brooklyn NY 11216 USA":
+```
+GET /parsePstlAdr?PstlAdr=<PstlAdr><AdrLine>781 Franklin Ave Crown Heights Brooklyn NY 11216 USA</AdrLine></PstlAdr>
+
+<PstlAdr>
+  <StrtNm>FRANKLIN AVE</StrtNm>
+  <BldgNb>781</BldgNb>
+  <PstCd>11216</PstCd>
+  <Ctry>USA</Ctry>
+</PstlAdr>
+
+```
 ### Healthcheck
 
 Endpoint `/health` can be use to check webserver healthcheck (like in k8s env):
